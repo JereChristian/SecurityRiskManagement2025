@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.secret_key = "your_secret_key"
 
 # MISP Configuration
-MISP_URL = "https://192.168.0.103"
+MISP_URL = "https://172.20.10.2"
 MISP_API_KEY = "d9PMltdN0rb2sw2hy3yEXaBfN7kHU08W2HdKniPQ"
 MISP_VERIFY_CERT = False  # Set to True if using a valid SSL certificate
 
@@ -255,7 +255,7 @@ def phase_4():
     if request.method == 'POST':
         # Retrieve all form fields
         risk_description = request.form.get('risk_description')
-        financial_impact = request.form.get('financial_impact')
+        financial_impact = request.form.get('financial_impact')  # Now expected to be in a 1-10 scale
         reputation_damage = request.form.get('reputation_damage')
         operational_impact = request.form.get('operational_impact')
         legal_impact = request.form.get('legal_impact')
@@ -265,6 +265,21 @@ def phase_4():
         # Validate that all fields are present
         if not all([risk_description, financial_impact, reputation_damage, operational_impact, legal_impact, risk_response, mitigation_strategy]):
             return "All fields are required!", 400
+
+        try:
+            financial_impact = int(financial_impact)
+            if financial_impact < 1 or financial_impact > 10:
+                return "Financial impact must be between 1 and 10.", 400
+        except ValueError:
+            return "Invalid financial impact value.", 400
+
+        # Dynamically set threat level based on financial impact scale (1-10)
+        if financial_impact >= 8:  # High financial impact
+            threat_level_id = "1"  # High threat level
+        elif financial_impact >= 5:  # Medium financial impact
+            threat_level_id = "2"  # Medium threat level
+        else:  # Low financial impact
+            threat_level_id = "3"  # Low threat level
 
         # Save Phase 4 data to Firestore
         phase_4_data = {
@@ -283,7 +298,7 @@ def phase_4():
         # Push risk data to MISP
         misp_event = {
             "info": f"Risk Assessment: {risk_description}",
-            "threat_level_id": "3",  # Medium threat level
+            "threat_level_id": threat_level_id,  # Dynamic threat level
             "analysis": "1",  # Initial analysis
             "distribution": "0",  # Your organization only
             "Attribute": [
